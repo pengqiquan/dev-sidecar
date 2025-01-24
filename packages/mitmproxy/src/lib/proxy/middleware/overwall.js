@@ -1,29 +1,36 @@
-const url = require('url')
-const request = require('request')
+const { Buffer } = require('node:buffer')
+const fs = require('node:fs')
+const path = require('node:path')
+const url = require('node:url')
 const lodash = require('lodash')
-const pac = require('./source/pac')
-const matchUtil = require('../../../utils/util.match')
+const request = require('request')
 const log = require('../../../utils/util.log')
-const path = require('path')
-const fs = require('fs')
-const { Buffer } = require('buffer')
+const matchUtil = require('../../../utils/util.match')
+const pac = require('./source/pac')
+
 let pacClient = null
 
 function matched (hostname, overWallTargetMap) {
+  // 匹配配置文件
   const ret1 = matchUtil.matchHostname(overWallTargetMap, hostname, 'matched overwall')
   if (ret1) {
-    return 'overwall config'
+    return 'in config'
+  } else if (ret1 === false || ret1 === 'false') {
+    log.debug(`域名 ${hostname} 的overwall配置为 false，跳过增强功能，即使它在 pac.txt 里`)
+    return null
   }
+
+  // 匹配 pac.txt
   if (pacClient == null) {
-    return false
+    return null
   }
-  const ret = pacClient.FindProxyForURL('https://' + hostname, hostname)
+  const ret = pacClient.FindProxyForURL(`https://${hostname}`, hostname)
   if (ret && ret.indexOf('PROXY ') === 0) {
     log.info(`matchHostname: matched overwall: '${hostname}' -> '${ret}' in pac.txt`)
-    return 'overwall pac'
+    return 'in pac.txt'
   } else {
     log.debug(`matchHostname: matched overwall: Not-Matched '${hostname}' -> '${ret}' in pac.txt`)
-    return false
+    return null
   }
 }
 
@@ -38,11 +45,11 @@ function getTmpPacFilePath () {
 }
 
 function loadPacLastModifiedTime (pacTxt) {
-  const matched = pacTxt.match(/(?<=! Last Modified: )[^\n]+/g)
+  const matched = pacTxt.match(/(?<=! Last Modified: )[^\r\n]+/g)
   if (matched && matched.length > 0) {
     try {
       return new Date(matched[0])
-    } catch (ignore) {
+    } catch {
       return null
     }
   }
@@ -61,13 +68,18 @@ function formatDate (date) {
 // 保存 pac 内容到 `~/pac.txt` 文件中
 function savePacFile (pacTxt) {
   const pacFilePath = getTmpPacFilePath()
-  fs.writeFileSync(pacFilePath, pacTxt)
-  log.info('保存 pac.txt 文件成功:', pacFilePath)
+  try {
+    fs.writeFileSync(pacFilePath, pacTxt)
+    log.info('保存 pac.txt 文件成功:', pacFilePath)
+  } catch (e) {
+    log.error('保存 pac.txt 文件失败:', pacFilePath, ', error:', e)
+    return
+  }
 
   // 尝试解析和修改 pac.txt 文件时间
   const lastModifiedTime = loadPacLastModifiedTime(pacTxt)
   if (lastModifiedTime) {
-    fs.stat(pacFilePath, (err, stats) => {
+    fs.stat(pacFilePath, (err, _stats) => {
       if (err) {
         log.error('修改 pac.txt 文件时间失败:', err)
         return
@@ -83,8 +95,6 @@ function savePacFile (pacTxt) {
       })
     })
   }
-
-  return pacFilePath
 }
 
 // 异步下载 pac.txt ，避免影响代理服务的启动速度
@@ -93,7 +103,7 @@ async function downloadPacAsync (pacConfig) {
   log.info('开始下载远程 pac.txt 文件:', remotePacFileUrl)
   request(remotePacFileUrl, (error, response, body) => {
     if (error) {
-      log.error('下载远程 pac.txt 文件失败, error:', error, ', response:', response, ', body:', body)
+      log.error(`下载远程 pac.txt 文件失败: ${remotePacFileUrl}, error:`, error, ', response:', response, ', body:', body)
       return
     }
     if (response && response.statusCode === 200) {
@@ -106,10 +116,11 @@ async function downloadPacAsync (pacConfig) {
 
       // 尝试解析Base64（注：https://gitlab.com/gfwlist/gfwlist/raw/master/gfwlist.txt 下载下来的是Base64格式）
       let pacTxt = body
-      try {
-        pacTxt = Buffer.from(pacTxt, 'base64').toString('utf8')
-      } catch (e) {
-        if (pacTxt.indexOf('||') < 0) { // TODO: 待优化，需要判断下载的 pac.txt 文件内容是否正确，目前暂时先简单判断一下
+      if (!pacTxt.includes('!---------------------EOF')) {
+        try {
+          pacTxt = Buffer.from(pacTxt, 'base64').toString('utf8')
+          // log.debug('解析 base64 后的 pax:', pacTxt)
+        } catch {
           log.error(`远程 pac.txt 文件内容即不是base64格式，也不是要求的格式，url: ${remotePacFileUrl}，body: ${body}`)
           return
         }
@@ -118,7 +129,7 @@ async function downloadPacAsync (pacConfig) {
       // 保存到本地
       savePacFile(pacTxt)
     } else {
-      log.error('下载远程 pac.txt 文件失败, response:', response, ', body:', body)
+      log.error(`下载远程 pac.txt 文件失败: ${remotePacFileUrl}, response:`, response, ', body:', body)
     }
   })
 }
@@ -143,18 +154,18 @@ function createOverwallMiddleware (overWallConfig) {
   }
   const overWallTargetMap = matchUtil.domainMapRegexply(overWallConfig.targets)
   return {
-    sslConnectInterceptor: (req, cltSocket, head) => {
+    sslConnectInterceptor: (req, _cltSocket, _head) => {
       const hostname = req.url.split(':')[0]
       return matched(hostname, overWallTargetMap)
     },
-    requestIntercept (context, req, res, ssl, next) {
+    requestIntercept (context, req, res, _ssl, _next) {
       const { rOptions, log, RequestCounter } = context
       if (rOptions.protocol === 'http:') {
         return
       }
       const hostname = rOptions.hostname
       const matchedResult = matched(hostname, overWallTargetMap)
-      if (!matchedResult) {
+      if (matchedResult == null || matchedResult === false || matchedResult === 'false') {
         return
       }
       const cacheKey = '__over_wall_proxy__'
@@ -172,7 +183,7 @@ function createOverwallMiddleware (overWallConfig) {
           context.requestCount = {
             key: cacheKey,
             value: count.value,
-            count
+            count,
           }
         }
       }
@@ -181,10 +192,10 @@ function createOverwallMiddleware (overWallConfig) {
       const port = server[domain].port
       const path = server[domain].path
       const password = server[domain].password
-      const proxyTarget = domain + '/' + path + '/' + hostname + req.url
+      const proxyTarget = `${domain}/${path}/${hostname}${req.url}`
 
       // const backup = interceptOpt.backup
-      const proxy = proxyTarget.indexOf('http:') === 0 || proxyTarget.indexOf('https:') === 0 ? proxyTarget : (rOptions.protocol + '//' + proxyTarget)
+      const proxy = proxyTarget.indexOf('http:') === 0 || proxyTarget.indexOf('https:') === 0 ? proxyTarget : (`${rOptions.protocol}//${proxyTarget}`)
       // eslint-disable-next-line node/no-deprecated-api
       const URL = url.parse(proxy)
       rOptions.origional = lodash.cloneDeep(rOptions) // 备份原始请求参数
@@ -209,12 +220,12 @@ function createOverwallMiddleware (overWallConfig) {
       res.setHeader('DS-Overwall', matchedResult)
 
       return true
-    }
+    },
   }
 }
 
 module.exports = {
   getTmpPacFilePath,
   downloadPacAsync,
-  createOverwallMiddleware
+  createOverwallMiddleware,
 }

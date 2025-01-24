@@ -26,9 +26,7 @@ EOF
 }
 export default {
   install (context) {
-    const { ipcMain, dialog, log, app } = context
-
-    const ex = app.getPath('exe')
+    const { ipcMain, app } = context
 
     // 定义事件，渲染进程中直接使用
 
@@ -44,8 +42,9 @@ export default {
             openAtLogin: true,
             openAsHidden: true,
             args: [
-              '--hideWindow', '"true"'
-            ]
+              '--hideWindow',
+              '"true"',
+            ],
           })
         }
 
@@ -57,12 +56,12 @@ export default {
           app.setLoginItemSettings({
             openAtLogin: false,
             openAsHidden: false,
-            args: []
+            args: [],
           })
         }
 
         event.sender.send('auto-start', { key: 'enabled', value: false })
       }
     })
-  }
+  },
 }

@@ -1,4 +1,5 @@
 const pluginConfig = require('./config')
+
 const Plugin = function (context) {
   const { config, shell, event, log } = context
   const pluginApi = {
@@ -28,8 +29,8 @@ const Plugin = function (context) {
 
     async setProxy (ip, port) {
       const cmds = [
-        `git config --global http.proxy  http://${ip}:${port} `,
-        `git config --global https.proxy http://${ip}:${port} `
+        `git config --global http.proxy  http://${ip}:${port - 1} `,
+        `git config --global https.proxy http://${ip}:${port} `,
       ]
 
       if (config.get().plugin.git.setting.sslVerify === true) {
@@ -55,13 +56,13 @@ const Plugin = function (context) {
 
       try {
         await shell.exec(['git config --global --unset https.proxy '], { type: 'cmd' })
-      } catch (ignore) {
+      } catch {
       }
 
       if (config.get().plugin.git.setting.sslVerify === true) {
         try {
           await shell.exec(['git config --global --unset http.sslVerify '], { type: 'cmd' })
-        } catch (ignore) {
+        } catch {
         }
       }
 
@@ -69,14 +70,14 @@ const Plugin = function (context) {
         for (const url in config.get().plugin.git.setting.noProxyUrls) {
           try {
             await shell.exec([`git config --global --unset http."${url}".proxy `], { type: 'cmd' })
-          } catch (ignore) {
+          } catch {
           }
         }
       }
       event.fire('status', { key: 'plugin.git.enabled', value: false })
       log.info('关闭【Git】代理成功')
       return ret
-    }
+    },
   }
   return pluginApi
 }
@@ -85,7 +86,7 @@ module.exports = {
   key: 'git',
   config: pluginConfig,
   status: {
-    enabled: false
+    enabled: false,
   },
-  plugin: Plugin
+  plugin: Plugin,
 }

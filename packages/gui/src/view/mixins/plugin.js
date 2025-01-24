@@ -1,9 +1,9 @@
-import DsContainer from '../components/container'
 import lodash from 'lodash'
+import DsContainer from '../components/container'
 
 export default {
   components: {
-    DsContainer
+    DsContainer,
   },
   data () {
     return {
@@ -14,7 +14,7 @@ export default {
       wrapperCol: { span: 19 },
       resetDefaultLoading: false,
       applyLoading: false,
-      systemPlatform: ''
+      systemPlatform: '',
     }
   },
   created () {
@@ -44,10 +44,13 @@ export default {
         return // 防重复提交
       }
       this.applyLoading = true
-      await this.applyBefore()
-      await this.saveConfig()
-      await this.applyAfter()
-      this.applyLoading = false
+      try {
+        await this.applyBefore()
+        await this.saveConfig()
+        await this.applyAfter()
+      } finally {
+        this.applyLoading = false
+      }
     },
     async applyBefore () {
 
@@ -64,14 +67,17 @@ export default {
         okText: '确定',
         onOk: async () => {
           this.resetDefaultLoading = true
-          this.config = await this.$api.config.resetDefault(key)
-          if (this.ready) {
-            await this.ready(this.config)
+          try {
+            this.config = await this.$api.config.resetDefault(key)
+            if (this.ready) {
+              await this.ready(this.config)
+            }
+            await this.apply()
+          } finally {
+            this.resetDefaultLoading = false
           }
-          await this.apply()
-          this.resetDefaultLoading = false
         },
-        onCancel () {}
+        onCancel () {},
       })
     },
     saveConfig () {
@@ -131,6 +137,10 @@ export default {
     },
     isLinux () {
       return this.systemPlatform === 'linux'
-    }
-  }
+    },
+    async openLog () {
+      const dir = await this.$api.info.getLogDir()
+      this.$api.ipc.openPath(dir)
+    },
+  },
 }
