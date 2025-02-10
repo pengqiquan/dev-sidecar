@@ -3,11 +3,7 @@ const log = require('./utils/util.log')
 // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 
 // 避免异常崩溃
-process.on('uncaughtException', function (err) {
-  if (err.code === 'ECONNABORTED') {
-    //  console.error(err.errno)
-    return
-  }
+process.on('uncaughtException', (err) => {
   log.error('Process Uncaught Exception:', err)
 })
 

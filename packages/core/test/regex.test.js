@@ -1,13 +1,16 @@
+const assert = require('node:assert')
 const expect = require('chai').expect
 // eslint-disable-next-line no-undef
-describe('test', function () {
+describe('test', () => {
   // eslint-disable-next-line no-undef
-  it('regexp', function () {
-    const test = '^/[^/]+/[^/]+(/releases(/.*)?)?$'
+  it('regexp', () => {
+    const test = '^/[^/]+/[^/]+(?:/releases(?:/.*)?)?$'
     const reg = new RegExp(test)
 
     const ret = reg.test('/docmirror/dev-sidecar/releases/tag')
-    // eslint-disable-next-line no-unused-expressions
+    console.log(ret)
+    assert.strictEqual(ret, true)
+
     expect(ret).be.ok
   })
 })
