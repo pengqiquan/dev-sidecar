@@ -1,19 +1,19 @@
-const config = require('../../config')
+const fork = require('node:child_process').fork
+const fs = require('node:fs')
+const path = require('node:path')
+const lodash = require('lodash')
+const config = require('../../config-api')
 const event = require('../../event')
 const status = require('../../status')
-const lodash = require('lodash')
-const fork = require('child_process').fork
-const log = require('../../utils/util.log')
-const fs = require('fs')
-const path = require('path')
 const jsonApi = require('@docmirror/mitmproxy/src/json')
+const log = require('../../utils/util.log.core')
 
 let server = null
 function fireStatus (status) {
   event.fire('status', { key: 'server.enabled', value: status })
 }
 function sleep (time) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     setTimeout(() => {
       resolve()
     }, time)
@@ -76,15 +76,20 @@ const serverApi = {
     // fireStatus('ing') // 启动中
     const basePath = serverConfig.setting.userBasePath
     const runningConfigPath = path.join(basePath, '/running.json')
-    fs.writeFileSync(runningConfigPath, jsonApi.stringify(serverConfig))
-    log.info('保存 running.json 运行时配置文件成功:', runningConfigPath)
+    try {
+      fs.writeFileSync(runningConfigPath, jsonApi.stringify(serverConfig))
+      log.info('保存 running.json 运行时配置文件成功:', runningConfigPath)
+    } catch (e) {
+      log.error('保存 running.json 运行时配置文件失败:', runningConfigPath, ', error:', e)
+      throw e
+    }
     const serverProcess = fork(mitmproxyPath, [runningConfigPath])
     server = {
       id: serverProcess.pid,
       process: serverProcess,
       close () {
         serverProcess.send({ type: 'action', event: { key: 'close' } })
-      }
+      },
     }
     serverProcess.on('beforeExit', (code) => {
       log.warn('server process beforeExit, code:', code)
@@ -98,7 +103,7 @@ const serverApi = {
     serverProcess.on('uncaughtException', (err, origin) => {
       log.error('server process uncaughtException:', err)
     })
-    serverProcess.on('message', function (msg) {
+    serverProcess.on('message', (msg) => {
       log.info('收到子进程消息:', JSON.stringify(msg))
       if (msg.type === 'status') {
         fireStatus(msg.event)
@@ -166,6 +171,6 @@ const serverApi = {
     if (server) {
       server.process.send({ type: 'speed', event: { key: 'reTest' } })
     }
-  }
+  },
 }
 module.exports = serverApi

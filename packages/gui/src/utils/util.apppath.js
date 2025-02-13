@@ -1,6 +1,8 @@
-import path from 'path'
-import os from 'os'
-function getSystemPlatform () {
+import os from 'node:os'
+import path from 'node:path'
+import log from './util.log.gui'
+
+function getSystemPlatform (throwIfUnknown = false) {
   switch (os.platform()) {
     case 'darwin':
       return 'mac'
@@ -10,11 +12,16 @@ function getSystemPlatform () {
       return 'windows'
     case 'win64':
       return 'windows'
-    case 'unknown os':
     default:
-      throw new Error(`UNKNOWN OS TYPE ${os.platform()}`)
+      log.error(`UNKNOWN OS TYPE: ${os.platform()}`)
+      if (throwIfUnknown) {
+        throw new Error(`UNKNOWN OS TYPE ${os.platform()}`)
+      } else {
+        return 'unknown-os'
+      }
   }
 }
+
 export default {
   getAppRootPath (app) {
     const exePath = app.getPath('exe')
@@ -22,5 +29,5 @@ export default {
       return path.join(exePath, '../../')
     }
     return path.join(exePath, '../')
-  }
+  },
 }

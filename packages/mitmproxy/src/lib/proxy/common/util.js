@@ -1,9 +1,10 @@
-const url = require('url')
+const url = require('node:url')
+const tunnelAgent = require('tunnel-agent')
+const log = require('../../../utils/util.log.server')
+const matchUtil = require('../../../utils/util.match')
 const Agent = require('./ProxyHttpAgent')
 const HttpsAgent = require('./ProxyHttpsAgent')
-const tunnelAgent = require('tunnel-agent')
-const log = require('../../../utils/util.log')
-const matchUtil = require('../../../utils/util.match')
+
 const util = exports
 
 const httpsAgentCache = {}
@@ -20,38 +21,58 @@ function getTimeoutConfig (hostname, serverSetting) {
 
   return {
     timeout: timeoutConfig.timeout || serverSetting.defaultTimeout || 20000,
-    keepAliveTimeout: timeoutConfig.keepAliveTimeout || serverSetting.defaultKeepAliveTimeout || 30000
+    keepAliveTimeout: timeoutConfig.keepAliveTimeout || serverSetting.defaultKeepAliveTimeout || 30000,
   }
 }
 
-function createHttpsAgent (timeoutConfig) {
-  const key = timeoutConfig.timeout + '-' + timeoutConfig.keepAliveTimeout
+function createHttpsAgent (timeoutConfig, verifySsl) {
+  const key = `${timeoutConfig.timeout}-${timeoutConfig.keepAliveTimeout}`
   if (!httpsAgentCache[key]) {
-    httpsAgentCache[key] = new HttpsAgent({
+    verifySsl = !!verifySsl
+
+    // 证书回调函数
+    const checkServerIdentity = (host, cert) => {
+      log.info(`checkServerIdentity: ${host}, CN: ${cert.subject.CN}, C: ${cert.subject.C || cert.issuer.C}, ST: ${cert.subject.ST || cert.issuer.ST}, bits: ${cert.bits}`)
+    }
+
+    const agent = new HttpsAgent({
       keepAlive: true,
       timeout: timeoutConfig.timeout,
       keepAliveTimeout: timeoutConfig.keepAliveTimeout,
-      rejectUnauthorized: false
+      checkServerIdentity,
+      rejectUnauthorized: verifySsl,
     })
+
+    agent.unVerifySslAgent = new HttpsAgent({
+      keepAlive: true,
+      timeout: timeoutConfig.timeout,
+      keepAliveTimeout: timeoutConfig.keepAliveTimeout,
+      checkServerIdentity,
+      rejectUnauthorized: false,
+    })
+
+    httpsAgentCache[key] = agent
+    log.info('创建 HttpsAgent 成功, timeoutConfig:', timeoutConfig, ', verifySsl:', verifySsl)
   }
   return httpsAgentCache[key]
 }
 
 function createHttpAgent (timeoutConfig) {
-  const key = timeoutConfig.timeout + '-' + timeoutConfig.keepAliveTimeout
+  const key = `${timeoutConfig.timeout}-${timeoutConfig.keepAliveTimeout}`
   if (!httpAgentCache[key]) {
     httpAgentCache[key] = new Agent({
       keepAlive: true,
       timeout: timeoutConfig.timeout,
-      keepAliveTimeout: timeoutConfig.keepAliveTimeout
+      keepAliveTimeout: timeoutConfig.keepAliveTimeout,
     })
+    log.info('创建 HttpAgent 成功, timeoutConfig:', timeoutConfig)
   }
   return httpAgentCache[key]
 }
 
-function createAgent (protocol, timeoutConfig) {
+function createAgent (protocol, timeoutConfig, verifySsl) {
   return protocol === 'https:'
-    ? createHttpsAgent(timeoutConfig)
+    ? createHttpsAgent(timeoutConfig, verifySsl)
     : createHttpAgent(timeoutConfig)
 }
 
@@ -60,12 +81,12 @@ util.parseHostnameAndPort = (host, defaultPort) => {
   if (arr) {
     arr = arr.slice(1)
     if (arr[1]) {
-      arr[1] = parseInt(arr[1], 10)
+      arr[1] = Number.parseInt(arr[1], 10)
     }
   } else {
     arr = host.split(':')
     if (arr.length > 1) {
-      arr[1] = parseInt(arr[1], 10)
+      arr[1] = Number.parseInt(arr[1], 10)
     }
   }
 
@@ -78,7 +99,7 @@ util.parseHostnameAndPort = (host, defaultPort) => {
   return arr
 }
 
-util.getOptionsFromRequest = (req, ssl, externalProxy = null, serverSetting) => {
+util.getOptionsFromRequest = (req, ssl, externalProxy = null, serverSetting, compatibleConfig = null) => {
   // eslint-disable-next-line node/no-deprecated-api
   const urlObject = url.parse(req.url)
   const defaultPort = ssl ? 443 : 80
@@ -110,7 +131,7 @@ util.getOptionsFromRequest = (req, ssl, externalProxy = null, serverSetting) => 
     if (headers.connection !== 'close') {
       const timeoutConfig = getTimeoutConfig(hostname, serverSetting)
       // log.info(`get timeoutConfig '${hostname}':`, timeoutConfig)
-      agent = createAgent(protocol, timeoutConfig)
+      agent = createAgent(protocol, timeoutConfig, serverSetting.verifySsl)
       headers.connection = 'keep-alive'
     } else {
       agent = false
@@ -128,7 +149,8 @@ util.getOptionsFromRequest = (req, ssl, externalProxy = null, serverSetting) => 
     port,
     path: urlObject.path,
     headers: req.headers,
-    agent
+    agent,
+    compatibleConfig,
   }
 
   // eslint-disable-next-line node/no-deprecated-api
@@ -167,8 +189,8 @@ util.getTunnelAgent = (requestIsSSL, externalProxyUrl) => {
         httpsOverHttpAgent = tunnelAgent.httpsOverHttp({
           proxy: {
             host: hostname,
-            port: port
-          }
+            port,
+          },
         })
       }
       return httpsOverHttpAgent
@@ -177,8 +199,8 @@ util.getTunnelAgent = (requestIsSSL, externalProxyUrl) => {
         httpsOverHttpsAgent = tunnelAgent.httpsOverHttps({
           proxy: {
             host: hostname,
-            port: port
-          }
+            port,
+          },
         })
       }
       return httpsOverHttpsAgent
@@ -199,8 +221,8 @@ util.getTunnelAgent = (requestIsSSL, externalProxyUrl) => {
         httpOverHttpsAgent = tunnelAgent.httpOverHttps({
           proxy: {
             host: hostname,
-            port: port
-          }
+            port,
+          },
         })
       }
       return httpOverHttpsAgent

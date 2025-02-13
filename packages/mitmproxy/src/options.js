@@ -1,13 +1,13 @@
-const interceptorImpls = require('./lib/interceptor')
-const dnsUtil = require('./lib/dns')
-const log = require('./utils/util.log')
-const matchUtil = require('./utils/util.match')
-const path = require('path')
-const fs = require('fs')
+const fs = require('node:fs')
+const path = require('node:path')
 const lodash = require('lodash')
+const jsonApi = require('./json')
+const dnsUtil = require('./lib/dns')
+const interceptorImpls = require('./lib/interceptor')
 const scriptInterceptor = require('./lib/interceptor/impl/res/script')
-
 const { getTmpPacFilePath, downloadPacAsync, createOverwallMiddleware } = require('./lib/proxy/middleware/overwall')
+const log = require('./utils/util.log.server')
+const matchUtil = require('./utils/util.match')
 
 // 处理拦截配置
 function buildIntercepts (intercepts) {
@@ -69,7 +69,9 @@ module.exports = (serverConfig) => {
     }
 
     if (!pacConfig.pacFileAbsolutePath) {
+      log.info('setting.rootDir:', setting.rootDir)
       pacConfig.pacFileAbsolutePath = path.join(setting.rootDir, pacConfig.pacFilePath)
+      log.info('读取内置的 pac.txt 文件:', pacConfig.pacFileAbsolutePath)
       if (pacConfig.autoUpdate) {
         log.warn('远程 pac.txt 文件下载失败或还在下载中，现使用内置 pac.txt 文件:', pacConfig.pacFileAbsolutePath)
       }
@@ -92,26 +94,34 @@ module.exports = (serverConfig) => {
     port: serverConfig.port,
     dnsConfig: {
       preSetIpList,
-      providers: dnsUtil.initDNS(serverConfig.dns.providers, preSetIpList),
+      dnsMap: dnsUtil.initDNS(serverConfig.dns.providers, preSetIpList),
       mapping: matchUtil.domainMapRegexply(dnsMapping),
-      speedTest: serverConfig.dns.speedTest
+      speedTest: serverConfig.dns.speedTest,
     },
     setting,
-    sniConfig: serverConfig.sniList,
+    compatibleConfig: {
+      connect: serverConfig.compatible ? matchUtil.domainMapRegexply(serverConfig.compatible.connect) : {},
+      request: serverConfig.compatible ? matchUtil.domainMapRegexply(serverConfig.compatible.request) : {},
+    },
     middlewares,
     sslConnectInterceptor: (req, cltSocket, head) => {
       const hostname = req.url.split(':')[0]
+
+      // 配置了白名单的域名，将跳过代理
       const inWhiteList = matchUtil.matchHostname(whiteList, hostname, 'in whiteList') != null
       if (inWhiteList) {
-        log.info('为白名单域名，不拦截:', hostname)
-        return false // 所有都不拦截
+        log.info(`为白名单域名，不拦截: ${hostname}, headers:`, jsonApi.stringify2(req.headers))
+        return false // 不拦截
       }
+
       // 配置了拦截的域名，将会被代理
-      const matched = !!matchUtil.matchHostname(intercepts, hostname, 'matched intercepts')
-      if (matched === true) {
+      const matched = matchUtil.matchHostname(intercepts, hostname, 'matched intercepts')
+      if ((!!matched) === true) {
+        log.debug(`拦截器拦截：${req.url}, matched:`, matched)
         return matched // 拦截
       }
-      return null // 未匹配到任何拦截配置，由下一个拦截器判断
+
+      return null // 不在白名单中，也未配置在拦截功能中，跳过当前拦截器，由下一个拦截器判断
     },
     createIntercepts: (context) => {
       const rOptions = context.rOptions
@@ -124,12 +134,9 @@ module.exports = (serverConfig) => {
       const matchInterceptsOpts = {}
       for (const regexp in interceptOpts) { // 遍历拦截配置
         // 判断是否匹配拦截器
-        let matched
-        if (regexp !== true && regexp !== 'true') {
-          matched = matchUtil.isMatched(rOptions.path, regexp)
-          if (matched == null) { // 拦截器匹配失败
-            continue
-          }
+        const matched = matchUtil.isMatched(rOptions.path, regexp)
+        if (matched == null) { // 拦截器匹配失败
+          continue
         }
 
         // 获取拦截器
@@ -197,19 +204,21 @@ module.exports = (serverConfig) => {
             }
             matchInterceptsOpts[impl.name] = {
               order: interceptOpt.order || 0,
-              index: matchIntercepts.length - 1
+              index: matchIntercepts.length - 1,
             }
           }
         }
       }
 
-      matchIntercepts.sort((a, b) => { return a.priority - b.priority })
+      matchIntercepts.sort((a, b) => {
+        return a.priority - b.priority
+      })
       // for (const interceptor of matchIntercepts) {
       //   log.info('interceptor:', interceptor.name, 'priority:', interceptor.priority)
       // }
 
       return matchIntercepts
-    }
+    },
   }
 
   if (setting.rootCaFile) {

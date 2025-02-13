@@ -14,7 +14,7 @@ function readConfig (config, defaultConfig) {
 
 module.exports = {
   name: 'options',
-  priority: 1,
+  priority: 101,
   requestIntercept (context, interceptOpt, req, res, ssl, next) {
     const { rOptions, log } = context
 
@@ -34,7 +34,7 @@ module.exports = {
       'Access-Control-Allow-Headers': allowHeaders,
       'Access-Control-Allow-Methods': allowMethods,
       'Access-Control-Max-Age': interceptOpt.optionsMaxAge > 0 ? interceptOpt.optionsMaxAge : 2592000, // 默认有效一个月
-      Date: new Date().toUTCString()
+      'Date': new Date().toUTCString(),
     }
 
     // 判断是否允许
@@ -50,5 +50,5 @@ module.exports = {
   },
   is (interceptOpt) {
     return !!interceptOpt.options
-  }
+  },
 }

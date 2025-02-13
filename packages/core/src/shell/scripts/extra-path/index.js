@@ -1,5 +1,5 @@
-const log = require('../../../utils/util.log')
-const path = require('path')
+const path = require('node:path')
+const log = require('../../../utils/util.log.core')
 
 function getExtraPath () {
   let extraPath = process.env.DS_EXTRA_PATH
@@ -15,17 +15,12 @@ function getProxyExePath () {
   return path.join(extraPath, 'sysproxy.exe')
 }
 
-function getClearBatPath () {
-  const extraPath = getExtraPath()
-  return path.join(extraPath, 'clear.bat')
-}
-
 function getEnableLoopbackPath () {
   const extraPath = getExtraPath()
   return path.join(extraPath, 'EnableLoopback.exe')
 }
+
 module.exports = {
   getProxyExePath,
   getEnableLoopbackPath,
-  getClearBatPath
 }

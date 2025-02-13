@@ -1,10 +1,11 @@
-const event = require('./event')
 const lodash = require('lodash')
-const log = require('./utils/util.log')
+const event = require('./event')
+const log = require('./utils/util.log.core')
+
 const status = {
   server: { enabled: false },
   proxy: {},
-  plugin: {}
+  plugin: {},
 }
 
 event.register('status', (event) => {

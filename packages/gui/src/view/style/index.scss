@@ -1,62 +1,96 @@
-.footer-bar{
-  padding:10px;
+.footer-bar {
+  padding: 10px;
   text-align: right;
-  border-top:#eee 1px solid;
+  border-top: #eee 1px solid;
 }
 
-.flex-l-r{
-  align-content:  center;
+.flex-l-r {
+  align-content: center;
   display: flex;
   justify-content: flex-end;
   align-items: center;
 
-  &>a{
-    align-content:  center;
+  & > a {
+    align-content: center;
     display: flex;
     align-items: center;
   }
 }
 
-.md-mr-5{margin-right: 5px;}
-.md-mr-10{margin-right: 10px;}
-.md-mr-15{margin-right: 15px;}
-.md-mr-20{margin-right: 20px;}
+.md-mr-5 {
+  margin-right: 5px;
+}
+.md-mr-10 {
+  margin-right: 10px;
+}
+.md-mr-15 {
+  margin-right: 15px;
+}
+.md-mr-20 {
+  margin-right: 20px;
+}
 
-.md-mt-5{margin-top: 5px;}
-.md-mt-10{margin-top: 10px;}
-.md-mt-15{margin-top: 15px;}
-.md-mt-20{margin-top: 20px;}
+.md-mt-0 {
+  margin-top: 0;
+}
+.md-mt-5 {
+  margin-top: 5px;
+}
+.md-mt-10 {
+  margin-top: 10px;
+}
+.md-mt-15 {
+  margin-top: 15px;
+}
+.md-mt-20 {
+  margin-top: 20px;
+}
 
+.md-ml-5 {
+  margin-left: 5px;
+}
+.md-ml-10 {
+  margin-left: 10px;
+}
+.md-ml-15 {
+  margin-left: 15px;
+}
+.md-ml-20 {
+  margin-left: 20px;
+}
 
-.md-ml-5{margin-left: 5px;}
-.md-ml-10{margin-left: 10px;}
-.md-ml-15{margin-left: 15px;}
-.md-ml-20{margin-left: 20px;}
+.md-mb-5 {
+  margin-bottom: 5px;
+}
+.md-mb-10 {
+  margin-bottom: 10px;
+}
+.md-mb-15 {
+  margin-bottom: 15px;
+}
+.md-mb-20 {
+  margin-bottom: 20px;
+}
 
-.md-mb-5{margin-bottom: 5px;}
-.md-mb-10{margin-bottom: 10px;}
-.md-mb-15{margin-bottom: 15px;}
-.md-mb-20{margin-bottom: 20px;}
-
-ol{
+ol {
   margin-block-start: 0em;
   margin-block-end: 0em;
   padding-inline-start: 20px;
 }
 
-.form-help{
-  font-size:12px;
+.form-help {
+  font-size: 12px;
   line-height: 15px;
   color: #a1a1a1;
 
-  i{
-    font-family: "Microsoft YaHei", serif;
+  i {
+    font-family: 'Microsoft YaHei', serif;
     font-style: normal;
     font-weight: bold;
   }
 
   code {
-    padding: 0 .4em;
+    padding: 0 0.4em;
   }
 }
 
@@ -66,13 +100,13 @@ code {
   border-radius: 6px;
   color: #888;
   background-color: #f1f1f1;
-  margin-left: .2em;
-  margin-right: .2em;
-  padding: .2em .4em;
+  margin-left: 0.2em;
+  margin-right: 0.2em;
+  padding: 0.2em 0.4em;
   white-space: break-spaces;
 }
 
-.ace_search_form .ace_searchbtn{
+.ace_search_form .ace_searchbtn {
   width: auto;
   min-width: 27px;
 }
@@ -105,5 +139,60 @@ hr {
     background-color: #eee;
     padding: 2px 5px;
     margin: 0 5px 5px 5px;
+  }
+}
+
+.help-list {
+  ul {
+    padding-left: 10px;
+
+    li {
+      list-style: none;
+      line-height: 30px;
+
+      div {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 14px;
+      }
+
+      a {
+        color: #3990e0;
+      }
+      a:hover {
+        text-decoration: underline;
+        color: #2c9be5;
+      }
+    }
+
+    // 嵌套列表
+    ul {
+      padding-left: 20px;
+    }
+  }
+
+  ul:first-child li:first-child div:first-child.title1 {
+    margin-top: 0;
+  }
+
+  .title1 {
+    font-size: 18px;
+    font-weight: bold;
+    border-bottom: 1px solid #eee;
+    margin-top: 12px;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    padding-left: 5px;
+  }
+
+  .title2 {
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+
+  .console {
+    font-family: Consolas, arial, serif;
   }
 }

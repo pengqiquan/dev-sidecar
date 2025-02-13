@@ -1,6 +1,7 @@
 const dnstls = require('dns-over-tls')
+const log = require('../../utils/util.log.server')
 const BaseDNS = require('./base')
-const log = require('../../utils/util.log')
+
 module.exports = class DNSOverTLS extends BaseDNS {
   async _lookup (hostname) {
     const { answers } = await dnstls.query(hostname)
